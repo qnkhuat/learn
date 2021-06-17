@@ -1,0 +1,5 @@
+/Users/earther/fun/6_learn/debugger/build/CMakeFiles/libelfin.dir
+/Users/earther/fun/6_learn/debugger/build/CMakeFiles/hello.dir
+/Users/earther/fun/6_learn/debugger/build/CMakeFiles/rebuild_cache.dir
+/Users/earther/fun/6_learn/debugger/build/CMakeFiles/edit_cache.dir
+/Users/earther/fun/6_learn/debugger/build/CMakeFiles/minidbg.dir
