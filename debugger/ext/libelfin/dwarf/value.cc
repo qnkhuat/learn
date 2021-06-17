@@ -127,6 +127,14 @@ value::as_exprloc() const
         return expr(cu, cur.get_section_offset(), size);
 }
 
+loclist
+value::as_loclist() const
+{
+        cursor cur(cu->data(), offset);
+        return loclist(cu, cur.get_section_offset());
+}
+
+
 bool
 value::as_flag() const
 {

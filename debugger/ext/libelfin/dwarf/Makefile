@@ -9,7 +9,7 @@ all: libdwarf++.a libdwarf++.so.$(SONAME) libdwarf++.so libdwarf++.pc
 
 SRCS := dwarf.cc cursor.cc die.cc value.cc abbrev.cc \
 	expr.cc rangelist.cc line.cc attrs.cc \
-	die_str_map.cc elf.cc to_string.cc
+	die_str_map.cc elf.cc to_string.cc loclist.cc
 HDRS := dwarf++.hh data.hh internal.hh small_vector.hh ../elf/to_hex.hh
 CLEAN :=
 

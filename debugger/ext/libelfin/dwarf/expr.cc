@@ -40,12 +40,10 @@ expr::evaluate(expr_context *ctx, const std::initializer_list<taddr> &arguments)
 
         // Create the initial stack.  arguments are in reverse order
         // (that is, element 0 is TOS), so reverse it.
-        if (arguments.size() > 0) {
-           stack.reserve(arguments.size());
-           for (const taddr* elt = arguments.end() - 1;
-              elt >= arguments.begin(); elt--)
-              stack.push_back(*elt);
-        }
+        stack.reserve(arguments.size());
+        for (const taddr *elt = arguments.end() - 1;
+             elt >= arguments.begin(); elt--)
+                stack.push_back(*elt);
 
         // Create a subsection for just this expression so we can
         // easily detect the end (including premature end).
@@ -130,8 +128,45 @@ expr::evaluate(expr_context *ctx, const std::initializer_list<taddr> &arguments)
 
                         // 2.5.1.2 Register based addressing
                 case DW_OP::fbreg:
-                        // XXX
-                        throw runtime_error("DW_OP_fbreg not implemented");
+                {
+                    for (const auto& die : cu->root()) {
+                        bool found = false;
+                        if (die.contains_section_offset(offset)) {
+                            auto frame_base_at = die[DW_AT::frame_base];
+                            expr_result frame_base{};
+
+                            if (frame_base_at.get_type() == value::type::loclist) {
+                                auto loclist = frame_base_at.as_loclist();
+                                frame_base = loclist.evaluate(ctx);
+                            }
+                            else if (frame_base_at.get_type() == value::type::exprloc) {
+                                auto expr = frame_base_at.as_exprloc();
+                                frame_base = expr.evaluate(ctx);
+                            }
+
+                            switch (frame_base.location_type) {
+                            case expr_result::type::reg:
+                                tmp1.u = (unsigned)frame_base.value;
+                                tmp2.s = cur.sleb128();
+                                stack.push_back((int64_t)ctx->reg(tmp1.u) + tmp2.s);
+                                found = true;
+                                break;
+                            case expr_result::type::address:
+                                tmp1.u = frame_base.value;
+                                tmp2.s = cur.sleb128();
+                                stack.push_back(tmp1.u + tmp2.s);
+                                found = true;
+                                break;
+                            case expr_result::type::literal:
+                            case expr_result::type::implicit:
+                            case expr_result::type::empty:
+                                throw expr_error("Unhandled frame base type for DW_OP_fbreg");
+                            }
+                        }
+                        if (found) break;
+                    }
+                    break;
+                }
                 case DW_OP::breg0...DW_OP::breg31:
                         tmp1.u = (unsigned)op - (unsigned)DW_OP::breg0;
                         tmp2.s = cur.sleb128();
@@ -206,9 +241,10 @@ expr::evaluate(expr_context *ctx, const std::initializer_list<taddr> &arguments)
                         stack.back() = ctx->form_tls_address(stack.back());
                         break;
                 case DW_OP::call_frame_cfa:
-                        // XXX
-                        throw runtime_error("DW_OP_call_frame_cfa not implemented");
-
+                        // Horrible hack which just reads the frame pointer on x86
+                        tmp1.u = 6;
+                        stack.push_back((int64_t)ctx->reg(tmp1.u));
+                        break;
                         // 2.5.1.4 Arithmetic and logical operations
 #define UBINOP(binop)                                                   \
                         do {                                            \

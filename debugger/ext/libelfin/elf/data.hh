@@ -553,7 +553,7 @@ struct Sym<Elf64, Order>
                 return (stb)(info >> 4);
         }
 
-        void set_binding(stb v)
+        void set_binding(stb v) const
         {
                 info = (info & 0xF) | ((unsigned char)v << 4);
         }

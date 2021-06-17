@@ -55,7 +55,6 @@ int main(int argc, char **argv) {
      *
      * The typed string is returned as a malloc() allocated string by
      * linenoise, so the user needs to free() it. */
-    
     while((line = linenoise("hello> ")) != NULL) {
         /* Do something with the string. */
         if (line[0] != '\0' && line[0] != '/') {
@@ -66,10 +65,6 @@ int main(int argc, char **argv) {
             /* The "/historylen" command will change the history len. */
             int len = atoi(line+11);
             linenoiseHistorySetMaxLen(len);
-        } else if (!strncmp(line, "/mask", 5)) {
-            linenoiseMaskModeEnable();
-        } else if (!strncmp(line, "/unmask", 7)) {
-            linenoiseMaskModeDisable();
         } else if (line[0] == '/') {
             printf("Unreconized command: %s\n", line);
         }
