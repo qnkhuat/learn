@@ -1,5 +1,0 @@
-/root/learn/debugger/build/CMakeFiles/rebuild_cache.dir
-/root/learn/debugger/build/CMakeFiles/edit_cache.dir
-/root/learn/debugger/build/CMakeFiles/libelfin.dir
-/root/learn/debugger/build/CMakeFiles/minidbg.dir
-/root/learn/debugger/build/CMakeFiles/hello.dir
