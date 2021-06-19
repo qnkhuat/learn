@@ -2,27 +2,24 @@ use nix::unistd::{fork, ForkResult, getpid, Pid, execv};
 use nix::sys::{ptrace, wait};
 use std::process::{Command, exit};
 use std::io::{self, Write};
-mod myptrace;
-
-extern crate libc;
+use std::ffi::CStr;
 
 struct Debugger {
     prog_name: String,
     pid: Pid,
 }
 
-//impl Debugger {
-//    pub fn run() {}
-//    pub fn continue() {}
-//    pub fn step() {}
-//}
+impl Debugger {
+    pub fn run() {}
+    pub fn continue() {}
+    pub fn step() {}
+}
 
 fn run_child(prog: &str) {
     println!("Receive program: {}", prog);
-    //ptrace::traceme().unwrap();
-    myptrace::traceme();
+    ptrace::traceme().unwrap();
 
-    let output = Command::new(prog).output().expect("Hello world!");
+    //let output = Command::new(prog).output().expect("Hello world!");
     //execv(prog, vec![]);
     io::stdout().write_all(&output.stdout).unwrap();
 }
@@ -37,12 +34,7 @@ fn run_parent(pid: Pid) {
             Ok(n) => {
                 match input.as_str().trim() {
                     "c" => {
-                        //ptrace::cont(pid, None).expect("Failed continue process");
-                        //myptrace::cont(pid);
-                        unsafe {
-                            libc::ptrace(libc::PTRACE_CONT, pid, 0, 0);
-                        }
-
+                        ptrace::cont(pid, None).expect("Failed continue process");
                     }
                     "q" => {
                         exit(0);
