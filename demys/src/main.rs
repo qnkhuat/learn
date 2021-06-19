@@ -23,10 +23,10 @@ let mut last_input: String = String::new();
       let input_split = input.trim().split(' ').collect::<Vec<&str>>();
 
       match input_split[0] {
-        "c" => {
+        "cont" => {
           prog.cont();
         }
-        "b" => {
+        "br" => {
           if input_split.len() < 2 {
             println!("Usage: b [addr]");
           } else {
@@ -35,35 +35,41 @@ let mut last_input: String = String::new();
             println!("Set breakpoint at addr: {}", addr);
           }
         }
-        "rh" => {
-          println!("AX: Accumulator");
-          println!("BX: Base");
-          println!("CX: Counter");
-          println!("DX: Data");
-          println!("R1-15: Genral");
-          println!("SP: Stack pointer");
-          println!("BP: Base pointer");
-          println!("SI: Source index");
-          println!("DI: Destination index");
-          println!("CS: Code segment");
-          println!("SS: Stack Segment");
-          println!("DS: Data Segment");
-          println!("(E|F|G)S: Extra Segment");
-        }
-        "r" => {
-          let mut user_struct = prog.get_user_struct();
-          if (input_split.len() > 2 && input_split[1] == "get") {
+        "reg" => {
+          if input_split.len() > 1 && input_split[1] == "help" {
+            println!("AX: Accumulator");
+            println!("BX: Base");
+            println!("CX: Counter");
+            println!("DX: Data");
+            println!("R1-15: Genral");
+            println!("SP: Stack pointer");
+            println!("BP: Base pointer");
+            println!("SI: Source index");
+            println!("DI: Destination index");
+            println!("CS: Code segment");
+            println!("SS: Stack Segment");
+            println!("DS: Data Segment");
+            println!("(E|F|G)S: Extra Segment");
+
+          } else if input_split.len() > 2 && input_split[1] == "get" {
+
+            let regs = prog.get_user_struct().regs;
             let reg_name = input_split[2].trim();
-            let reg_value = target::get_reg_by_name(&user_struct.regs, &reg_name).unwrap();
-            println!("Reg {}: {:016x}", reg_name, reg_value);
-          } else if (input_split.len() > 3 && input_split[1] == "set") {
+            let reg_value = target::get_reg_by_name(&regs, &reg_name).unwrap();
+            println!("Reg {}: {:016x}", reg_name, reg_value)
+
+          } else if input_split.len() > 3 && input_split[1] == "set" {
+            
+            let mut user_struct = prog.get_user_struct();
             let reg_name = input_split[2].trim();
             let set_value = u64::from_str_radix(&input_split[3], 16).unwrap();
+
             target::set_reg_by_name(&mut user_struct.regs, &reg_name, &set_value);
             prog.set_user_struct(&user_struct);
-            println!("Set Reg {}: {:016x}", reg_name, set_value);
+
           } else {
-            let regs = user_struct.regs;
+            let regs = prog.get_user_struct().regs;
+
             println!("rax: 0x{:016x} rbx: 0x{:016x} rcx: 0x{:016x} rdx: 0x{:016x}",
                      regs.rax, regs.rbx, regs.rcx, regs.rdx);
             println!("r15: 0x{:016x} r14: 0x{:016x} r13: 0x{:016x} r12: 0x{:016x}",
