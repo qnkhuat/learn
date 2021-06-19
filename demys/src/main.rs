@@ -5,6 +5,8 @@ mod unistd;
 mod ptrace;
 mod target;
 
+
+
 fn debug_loop(prog: &mut target::TargetProgram) {
 let mut last_input: String = String::new();
     loop {
@@ -49,19 +51,32 @@ let mut last_input: String = String::new();
           println!("(E|F|G)S: Extra Segment");
         }
         "r" => {
-          let regs = prog.get_user_struct().regs;
-          println!("RAX: 0x{:016x} RBX: 0x{:016x} RCX: 0x{:016x} RDX: 0x{:016x}",
-                   regs.rax, regs.rbx, regs.rcx, regs.rdx);
-          println!("R15: 0x{:016x} R14: 0x{:016x} R13: 0x{:016x} R12: 0x{:016x}",
-                   regs.r15, regs.r14, regs.r13, regs.r12);
-          println!("R11: 0x{:016x} R10: 0x{:016x} R9:  0x{:016x} R8:  0x{:016x}",
-                   regs.r11, regs.r10, regs.r9, regs.r8);
-          println!("RSP: 0x{:016x} RBP: 0x{:016x} RSI: 0x{:016x} RDI: 0x{:016x}",
-                   regs.rsp, regs.rbp, regs.rsi, regs.rdi);
-          println!("RIP: 0x{:016x} CS: 0x{:04x} EFLAGS: 0x{:08x}",
-                   regs.rip, regs.cs, regs.eflags);
-          println!("SS: 0x{:04x} DS: 0x{:04x} ES: 0x{:04x} FS: 0x{:04x} GS: 0x{:04x}",
-                   regs.ss, regs.ds, regs.es, regs.fs, regs.gs);
+          let mut user_struct = prog.get_user_struct();
+          if (input_split.len() > 2 && input_split[1] == "get") {
+            let reg_name = input_split[2].trim();
+            let reg_value = target::get_reg_by_name(&user_struct.regs, &reg_name).unwrap();
+            println!("Reg {}: {:016x}", reg_name, reg_value);
+          } else if (input_split.len() > 3 && input_split[1] == "set") {
+            let reg_name = input_split[2].trim();
+            let set_value = u64::from_str_radix(&input_split[3], 16).unwrap();
+            target::set_reg_by_name(&mut user_struct.regs, &reg_name, &set_value);
+            prog.set_user_struct(&user_struct);
+            println!("Set Reg {}: {:016x}", reg_name, set_value);
+          } else {
+            let regs = user_struct.regs;
+            println!("rax: 0x{:016x} rbx: 0x{:016x} rcx: 0x{:016x} rdx: 0x{:016x}",
+                     regs.rax, regs.rbx, regs.rcx, regs.rdx);
+            println!("r15: 0x{:016x} r14: 0x{:016x} r13: 0x{:016x} r12: 0x{:016x}",
+                     regs.r15, regs.r14, regs.r13, regs.r12);
+            println!("r11: 0x{:016x} r10: 0x{:016x} r9:  0x{:016x} r8:  0x{:016x}",
+                     regs.r11, regs.r10, regs.r9, regs.r8);
+            println!("rsp: 0x{:016x} rbp: 0x{:016x} rsi: 0x{:016x} rdi: 0x{:016x}",
+                     regs.rsp, regs.rbp, regs.rsi, regs.rdi);
+            println!("rip: 0x{:016x} cs: 0x{:04x} eflags: 0x{:08x}",
+                     regs.rip, regs.cs, regs.eflags);
+            println!("ss: 0x{:04x} ds: 0x{:04x} es: 0x{:04x} fs: 0x{:04x} gs: 0x{:04x}",
+                     regs.ss, regs.ds, regs.es, regs.fs, regs.gs);
+          }
         }
         "q" => {
           exit(0);

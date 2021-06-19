@@ -49,7 +49,8 @@ pub fn get_user_struct(pid: pid_t, user_struct: *mut libc::user) {
   }
 }
 
-pub fn write_user_struct(pid: pid_t, user_struct: *const libc::user) {
+
+pub fn set_user_struct(pid: pid_t, user_struct: *const libc::user) {
   unsafe {
     libc::ptrace(libc::PTRACE_SETREGS, pid, 0, user_struct);
   }
