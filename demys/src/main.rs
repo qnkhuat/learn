@@ -1,48 +1,25 @@
-use nix::unistd::{fork, ForkResult, getpid, Pid, execv};
-use nix::sys::{ptrace, wait};
-use std::process::{Command, exit};
-use std::io::{self, Write};
-mod myptrace;
+use std::process::{exit};
+use libc;
+mod unistd;
+mod ptrace;
 
-extern crate libc;
-
-struct Debugger {
-    prog_name: String,
-    pid: Pid,
-}
-
-//impl Debugger {
-//    pub fn run() {}
-//    pub fn continue() {}
-//    pub fn step() {}
-//}
-
-fn run_child(prog: &str) {
+fn run_child(prog: &String, argv: &[String]) {
     println!("Receive program: {}", prog);
-    //ptrace::traceme().unwrap();
-    myptrace::traceme();
-
-    let output = Command::new(prog).output().expect("Hello world!");
-    //execv(prog, vec![]);
-    io::stdout().write_all(&output.stdout).unwrap();
+    ptrace::traceme().unwrap();
+    unistd::execv(prog, argv);
 }
 
-
-fn run_parent(pid: Pid) {
-    println!("Parent process: {}", getpid());
-    wait::wait().unwrap();
+fn run_parent(pid: libc::pid_t) {
+    println!("Parent process: {}", unistd::getpid());
+    unistd::wait().unwrap();
     loop {
         let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(n) => {
+        match std::io::stdin().read_line(&mut input) {
+            Ok(_) => {
                 match input.as_str().trim() {
                     "c" => {
                         //ptrace::cont(pid, None).expect("Failed continue process");
-                        //myptrace::cont(pid);
-                        unsafe {
-                            libc::ptrace(libc::PTRACE_CONT, pid, 0, 0);
-                        }
-
+                        ptrace::cont(pid).unwrap();
                     }
                     "q" => {
                         exit(0);
@@ -56,24 +33,22 @@ fn run_parent(pid: Pid) {
 }
 
 fn main() {
-
-    match unsafe{fork()} {
-
-        Ok(ForkResult::Parent { child }) => {
-            let pid = getpid();
-            println!("Parent process pid: {}, with child pid: {}", pid, child);
-            run_parent(child);
-        }
-
-        Ok(ForkResult::Child) => {
-            let pid = getpid();
-            println!("I'm a new child process has pid: {}", pid);
-            run_child("./C/hello")
-        }
-
-        Err(err) => { 
-            panic!("fork() failed: {}", err);
-        }
-        
+    let pid = unistd::fork().unwrap();
+    if pid == 0 { // child
+        let cpid = unistd::getpid();
+        println!("I'm a new child process has pid: {}", cpid);
+        //// create a vector of zero terminated strings
+        //let args = std::env::args().map(|arg| CString::new(arg).unwrap() ).collect::<Vec<CString>>();
+        //// convert the strings to raw pointers
+        //let c_args = args.iter().map(|arg| arg.as_ptr()).collect::<Vec<*const c_char>>();
+        let args: Vec<String> = std::env::args().collect();
+        let target: &String = &args[1];
+        run_child(&target, &args[1..]);
+    } else if pid > 0 { // Parent
+        let ppid = unistd::getpid();
+        println!("Parent process pid: {}, with child pid: {}", ppid, pid);
+        run_parent(pid);
+    } else {
+        panic!("fork() failed");
     }
 }
