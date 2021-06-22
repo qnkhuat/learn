@@ -8,6 +8,8 @@ use std::process::{exit};
 use gimli;
 use object;
 use memmap;
+use object::{Object, ObjectSection};
+use std::{borrow, env, fs};
 
 fn str2usize(s: &str) -> usize {
   usize::from_str_radix(s.trim(), 16).unwrap()
@@ -44,6 +46,7 @@ pub struct TargetProgram {
   executable: String,
   breakpoints: Vec<Breakpoint>,
   base_addr: usize,
+  dwarf: gimli::Dwarf,
 }
 
 impl TargetProgram {
@@ -53,6 +56,7 @@ impl TargetProgram {
       executable: (*path).clone(),
       breakpoints: Vec::new(),
       base_addr: 0,
+      dawrf: gimli::Dwarf::new(),
     }
   }
 
@@ -65,12 +69,70 @@ impl TargetProgram {
     reader.read_line(&mut first_line).unwrap();
     self.base_addr = str2usize(first_line.split("-").collect::<Vec<&str>>()[0]);
   }
+  
+  pub fn load_dwarf(&mut self) {
+    let file = fs::File::open(&self.executable).unwrap();
+    let mmap = unsafe { memmap::Mmap::map(&file).unwrap() };
+    let object = object::File::parse(&*mmap).unwrap();
+    let endian = if object.is_little_endian() {
+      gimli::RunTimeEndian::Little
+    } else {
+      gimli::RunTimeEndian::Big
+    };
 
-  pub fn offset_load_addr(usize addr) {
+    let load_section = |id: gimli::SectionId| -> Result<borrow::Cow<[u8]>, gimli::Error> {
+      match object.section_by_name(id.name()) {
+        Some(ref section) => Ok(section
+                                .uncompressed_data()
+                                .unwrap_or(borrow::Cow::Borrowed(&[][..]))),
+        None => Ok(borrow::Cow::Borrowed(&[][..])),
+      }
+    };
+
+    // Load all of the sections.
+    let dwarf_cow = gimli::Dwarf::load(&load_section).unwrap();
+
+    // Borrow a `Cow<[u8]>` to create an `EndianSlice`.
+    let borrow_section: &dyn for<'a> Fn(
+        &'a borrow::Cow<[u8]>,
+    ) -> gimli::EndianSlice<'a, gimli::RunTimeEndian> =
+        &|section| gimli::EndianSlice::new(&*section, endian);
+
+    // Create `EndianSlice`s for all of the sections.
+    let dwarf = dwarf_cow.borrow(&borrow_section);
+    self.dwarf = dwarf;
+    //// Iterate over the compilation units.
+    //let mut iter = dwarf.units();
+    //while let Some(header) = iter.next().unwrap() {
+    //    println!(
+    //        "Unit at <.debug_info+0x{:x}>",
+    //        header.offset().as_debug_info_offset().unwrap().0
+    //    );
+    //    let unit = dwarf.unit(header).unwrap();
+
+    //    // Iterate over the Debugging Information Entries (DIEs) in the unit.
+    //    let mut depth = 0;
+    //    let mut entries = unit.entries();
+    //    while let Some((delta_depth, entry)) = entries.next_dfs().unwrap() {
+    //        depth += delta_depth;
+    //        println!("<{}><{:x}> {}", depth, entry.offset().0, entry.tag());
+
+    //        // Iterate over the attributes in the DIE.
+    //        let mut attrs = entry.attrs();
+    //        while let Some(attr) = attrs.next().unwrap() {
+    //            println!("   {}: {:?}", attr.name(), attr.value());
+    //        }
+    //    }
+    //}
+    return;
+    
+  }
+
+  pub fn offset_load_addr(&mut self, addr: usize) -> usize{
     return addr - self.base_addr;
   }
 
-  pub fn offset_dawrf_addr(usize addr) {
+  pub fn offset_dawrf_addr(&mut self, addr: usize) -> usize{
     return addr + self.base_addr;
   }
 
@@ -224,6 +286,7 @@ impl TargetProgram {
   pub fn run(&mut self) {
     self.wait();
     self.initialize_base_address();
+    self.load_dwarf();
 
     let mut last_input: String = String::new();
     println!("Start debugging process: {}", self.pid());

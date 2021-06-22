@@ -3,9 +3,6 @@ use libc;
 mod unistd;
 mod ptrace;
 mod target;
-use gimli;
-use object;
-use memmap;
 
 fn execute_debugee(executable: &String, argv: &[String]) {
   ptrace::traceme().unwrap();
