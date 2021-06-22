@@ -17,5 +17,7 @@ Dependencies:
 
 
 # What I learned
-- When a program run the OS will allocate for it a virutal memory, we can check the segment mapping at /proc/[pid]/maps
+- When a program run the OS will allocate a virutal memory space for it, we can check the segment mapping at /proc/[pid]/maps
 - We can find address of instruction of a program by objdump the binary, find the address of instruction we want to set. add it to the base address of program in the segment mapping
+- ELF(Executable and Linkable Format) : A format specifies how to store code, static data, debug info, strings in a binary.
+- DWARF : the debug information format commonly used with ELF. (`dwarfdump` is a tool like objdump but for dwarf)

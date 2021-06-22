@@ -1,10 +1,15 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 void hello() {
   printf("Hello World: ");
-
 }
+
+void illegal() {
+  printf("Illegal statement");
+}
+
 
 int main (int argc, char* argv[]) {
   if (argc > 1 ) {
