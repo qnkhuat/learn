@@ -1,8 +1,13 @@
 use libc::pid_t;
 use crate::unistd;
 use crate::ptrace;
-use std::io::{Write};
+use std::path::Path;
+use std::io::{self, Write, BufReader, BufRead};
+use std::fs::File;
 use std::process::{exit};
+use gimli;
+use object;
+use memmap;
 
 fn str2usize(s: &str) -> usize {
   usize::from_str_radix(s.trim(), 16).unwrap()
@@ -31,7 +36,6 @@ impl Breakpoint {
     ptrace::poke_data(self.pid, self.addr, self.orig_byte);
     self.enabled = false;
   }
-
 }
 
 // *** Target Program ***
@@ -39,6 +43,7 @@ pub struct TargetProgram {
   pub pid: pid_t,
   executable: String,
   breakpoints: Vec<Breakpoint>,
+  base_addr: usize,
 }
 
 impl TargetProgram {
@@ -46,14 +51,27 @@ impl TargetProgram {
     TargetProgram{
       pid: pid,
       executable: (*path).clone(),
-      breakpoints: Vec::new()
+      breakpoints: Vec::new(),
+      base_addr: 0,
     }
   }
 
   pub fn initialize_base_address(&mut self) {
     let maps_filename = std::fmt::format(format_args!("/proc/{}/maps", self.pid));
-    let maps = std::fs::read_to_string(maps_filename).expect("Failed to read mmaps file");
-    //println!(maps);
+    // Open the file in read-only mode (ignoring errors).
+    let file = File::open(maps_filename).unwrap();
+    let mut reader = BufReader::new(file);
+    let mut first_line = String::new();
+    reader.read_line(&mut first_line).unwrap();
+    self.base_addr = str2usize(first_line.split("-").collect::<Vec<&str>>()[0]);
+  }
+
+  pub fn offset_load_addr(usize addr) {
+    return addr - self.base_addr;
+  }
+
+  pub fn offset_dawrf_addr(usize addr) {
+    return addr + self.base_addr;
   }
 
   pub fn breakpoints(&mut self) -> Vec<Breakpoint>{
@@ -205,6 +223,8 @@ impl TargetProgram {
 
   pub fn run(&mut self) {
     self.wait();
+    self.initialize_base_address();
+
     let mut last_input: String = String::new();
     println!("Start debugging process: {}", self.pid());
     loop {
