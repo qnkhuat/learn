@@ -1,11 +1,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+void hello() {
+  printf("Hello World: ");
+
+}
+
 int main (int argc, char* argv[]) {
   if (argc > 1 ) {
-    printf("(%d)Hellooooooooooooo world: 0:%s, 1:%s\n", getpid(), argv[0], argv[1]);
+    hello();
+    printf("(%d): 0:%s, 1:%s\n", getpid(), argv[0], argv[1]);
   } else {
-    printf("(%d)Hellooooooooooooo world\n", getpid());
+    hello();
+    printf("(%d)\n", getpid());
   }
   return 0;
 }

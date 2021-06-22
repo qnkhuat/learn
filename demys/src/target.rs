@@ -3,77 +3,35 @@ use crate::unistd;
 use crate::ptrace;
 
 // *** Breakpoint ***
-struct Breakpoint {
-  addr: usize,
-  enabled: bool,
-  orig_byte: u8,
+#[derive(Clone)]
+pub struct Breakpoint {
+  pid: pid_t,
+  pub addr: usize,
+  pub orig_byte: usize, // the tutorial use u8. Why?
+  pub enabled: bool,
 }
 
-pub fn get_reg_by_name<'a>(regs: &libc::user_regs_struct, reg_name: &str) -> Result<u64, &'a str> {
-  return match reg_name.trim().to_ascii_lowercase().as_str() {
-    "rax" => Ok(regs.rax),
-    "rbx" => Ok(regs.rbx),
-    "rcx" => Ok(regs.rcx),
-    "rdx" => Ok(regs.rdx),
-    "r8"  => Ok(regs.r8),
-    "r9"  => Ok(regs.r9),
-    "r10" => Ok(regs.r10),
-    "r11" => Ok(regs.r11),
-    "r12" => Ok(regs.r12),
-    "r13" => Ok(regs.r13),
-    "r14" => Ok(regs.r14),
-    "r15" => Ok(regs.r15),
-    "rsp" => Ok(regs.rsp),
-    "rbp" => Ok(regs.rbp),
-    "rsi" => Ok(regs.rsi),
-    "rdi" => Ok(regs.rdi),
-    "rip" => Ok(regs.rip),
-    "cs"  => Ok(regs.cs),
-    "ds"  => Ok(regs.ds),
-    "es"  => Ok(regs.es),
-    "fs"  => Ok(regs.fs),
-    "gs"  => Ok(regs.gs),
-    "ss"  => Ok(regs.ss),
-    "eflags" => Ok(regs.eflags),
-    _ => Err("Reg not found")
-  };
-}
+impl Breakpoint {
+  pub fn enable(&mut self) {
+    let data = ptrace::peek_data(self.pid, self.addr).unwrap();
+    self.orig_byte = data;
+    self.enabled = true;
 
+    /* 0xCC is the machine code for int $3 on x86_64 - the interupt instruction */
+    ptrace::poke_data(self.pid, self.addr, 0xcc);
+  }
 
-pub fn set_reg_by_name(regs: &mut libc::user_regs_struct, reg_name: &str, value: &u64) {
-  match reg_name.trim().to_ascii_lowercase().as_str() {
-    "rax" => regs.rax = *value,
-    "rbx" => regs.rbx = *value,
-    "rcx" => regs.rcx = *value,
-    "rdx" => regs.rdx = *value,
-    "r8"  => regs.r8 = *value,
-    "r9"  => regs.r9 = *value,
-    "r10" => regs.r10 = *value,
-    "r11" => regs.r11 = *value,
-    "r12" => regs.r12 = *value,
-    "r13" => regs.r13 = *value,
-    "r14" => regs.r14 = *value,
-    "r15" => regs.r15 = *value,
-    "rsp" => regs.rsp = *value,
-    "rbp" => regs.rbp = *value,
-    "rsi" => regs.rsi = *value,
-    "rdi" => regs.rdi = *value,
-    "rip" => regs.rip = *value,
-    "cs"  => regs.cs = *value,
-    "ds"  => regs.ds = *value,
-    "es"  => regs.es = *value,
-    "fs"  => regs.fs = *value,
-    "gs"  => regs.gs = *value,
-    "ss"  => regs.ss = *value,
-    "eflags" => regs.eflags = *value,
-    _ => panic!("reg :{}not found", reg_name)
-  };
+  pub fn disable(&mut self) {
+    ptrace::poke_data(self.pid, self.addr, self.orig_byte);
+    self.enabled = false;
+  }
+
 }
 
 // *** Target Program ***
 pub struct TargetProgram {
   pub pid: pid_t,
-  pub executable: String,
+  executable: String,
   breakpoints: Vec<Breakpoint>,
 }
 
@@ -86,68 +44,96 @@ impl TargetProgram {
     }
   }
 
-  pub fn run(&self, argv: &[String]) {
+  pub fn breakpoints(&mut self) -> Vec<Breakpoint>{
+    return self.breakpoints.clone();
+
+  }
+
+  pub fn run(&mut self, argv: &[String]) {
     ptrace::traceme().unwrap();
-    unistd::execv(&self.executable, argv);
+    unistd::execv(&self.executable, argv).unwrap();
   }
 
-  pub fn step(&self) {
+  pub fn singlestep(&mut self) {
+    ptrace::singlestep(self.pid).unwrap();
   }
 
-  pub fn cont(&self) {
+  pub fn kill(&mut self) {
+    unistd::kill(self.pid);
+  }
+
+  pub fn cont(&mut self) {
+    println!("Before step over : 0x{:016x}", self.get_pc());
+    self.step_over_breakpoint();
+    println!("After step over : 0x{:016x}", self.get_pc());
     ptrace::cont(self.pid).unwrap();
+    println!("Continued process : 0x{:016x}", self.get_pc());
     self.wait();
+    println!("Wait again process : 0x{:016x}", self.get_pc());
   }
   
-  pub fn peek_data(&self, addr: usize) -> u8 {
-    /* align to 8 bytes */
-    let loc = (addr / 8) * 8;
-    let offset = addr % 8;
-    let data = ptrace::peek_data(self.pid, loc).unwrap();
-    let res = ((data & (0xff << (8 * offset))) >> (8 * offset)) as u8;
-    //println!("output data: {}", data);
-    //println!("offset: {}", offset);
-    //println!("Converted data: {}", res);
-    //println!("Addr: {}, Loc: {}", addr, loc);
-    return res;
+  pub fn peek_data(&mut self, addr: usize) -> usize {
+    let data: usize = ptrace::peek_data(self.pid, addr).unwrap();
+    return data;
   }
 
-  pub fn poke_data(&self, addr: usize, data: u8) {
-    let loc = (addr / 8) * 8;
-    let offset = addr % 8;
-    let orig_data = ptrace::peek_data(self.pid, loc).unwrap();
-    let new_data = (orig_data & !(0xff << (8 * offset))) | ((data as usize) << (8 * offset));
-    //println!("orig_data: {}", orig_data);
-    //println!("to_write_data: {}", data);
-    //println!("Converted data: {}", new_data);
-
-    ptrace::poke_data(self.pid, loc, new_data);
+  pub fn poke_data(&mut self, addr: usize, data: usize) {
+    ptrace::poke_data(self.pid, addr, data);
   }
 
-  pub fn wait(&self) {
-    unistd::wait().unwrap();
+  pub fn wait(&mut self) -> i32{
+    return unistd::wait().unwrap() as i32;
   }
   
-  pub fn pid(&self) -> &pid_t {&self.pid}
+  pub fn pid(&mut self) -> &pid_t {&self.pid}
+
+  pub fn get_pc(&mut self) -> usize {
+    return self.get_reg_value("rip");
+  }
+
+  pub fn set_pc(&mut self, value: &usize){
+    self.set_reg_value("rip", value);
+  }
 
 
   pub fn set_breakpoint(&mut self, addr: usize) {
-    let data = self.peek_data(addr);
-
+    
     /* 0xCC is the machine code for int $3 on x86_64 - the interupt instruction */
     self.poke_data(addr, 0xCC);
+
+    let data = self.peek_data(addr);
     let bp = Breakpoint{
+      pid: self.pid,
       addr: addr, 
       orig_byte: data,
       enabled:true
     };
     
     self.breakpoints.push(bp);
+  }
 
+  pub fn step_over_breakpoint(&mut self) {
+    // - 1 because execution will go pass the breakpoint
+    let prev_pc_location = self.get_pc() - 1; 
+    println!("Current_pc_location: 0x{:016x},  prev_pc_location: 0x{:016x}, len: {}", self.get_pc(), prev_pc_location, self.breakpoints.len());
 
-    // Peek data and save the current data to orig_byte
-    // Set the int3 instruction at the address
+    for i in 0..self.breakpoints.len() {
+      println!("Searching :{}, addr: 0x{:016x}, enabled: {}", i, self.breakpoints[i].addr, self.breakpoints[i].enabled);
+      println!("Do you even exist? :{} ", prev_pc_location == self.breakpoints[i].addr);
+      //let mut bp = self.breakpoints[i].clone();
+      if self.breakpoints[i].addr == prev_pc_location && self.breakpoints[i].enabled {
+        self.set_pc(&prev_pc_location);
+        println!("Reset the PC: 0x{:016x},  prev_pc_location: 0x{:016x}, The 2 should be equal now", self.get_pc(), prev_pc_location);
 
+        self.breakpoints[i].disable();
+        println!("PC before single step: 0x{:016x}", self.get_pc());
+        self.singlestep();
+        println!("PC after single step: 0x{:016x}", self.get_pc());
+        self.wait();
+        self.breakpoints[i].enable();
+        return;
+      }
+    }
   }
 
   pub fn get_user_struct(&mut self) -> libc::user {
@@ -159,11 +145,74 @@ impl TargetProgram {
   }
 
   pub fn set_user_struct(&mut self, user_struct: &libc::user) {
-    unsafe {
-      ptrace::set_user_struct(self.pid, user_struct);
+    ptrace::set_user_struct(self.pid, user_struct);
+  }
+
+  pub fn get_reg_value(&mut self, reg_name: &str) -> usize{
+    let regs = self.get_user_struct().regs;
+    return match reg_name.trim().to_ascii_lowercase().as_str() {
+      "rax" => regs.rax,
+      "rbx" => regs.rbx,
+      "rcx" => regs.rcx,
+      "rdx" => regs.rdx,
+      "r8"  => regs.r8,
+      "r9"  => regs.r9,
+      "r10" => regs.r10,
+      "r11" => regs.r11,
+      "r12" => regs.r12,
+      "r13" => regs.r13,
+      "r14" => regs.r14,
+      "r15" => regs.r15,
+      "rsp" => regs.rsp,
+      "rbp" => regs.rbp,
+      "rsi" => regs.rsi,
+      "rdi" => regs.rdi,
+      "rip" => regs.rip,
+      "cs"  => regs.cs,
+      "ds"  => regs.ds,
+      "es"  => regs.es,
+      "fs"  => regs.fs,
+      "gs"  => regs.gs,
+      "ss"  => regs.ss,
+      "eflags" => regs.eflags,
+      _ => panic!("Reg : {} not found", reg_name)
+    } as usize;
+  }
+
+  pub fn set_reg_value(&mut self, reg_name: &str, value: &usize) {
+    let mut user_struct = self.get_user_struct();
+    let value_u64 = *value as u64;
+    match reg_name.trim().to_ascii_lowercase().as_str() {
+      "rax" => user_struct.regs.rax = value_u64,
+      "rbx" => user_struct.regs.rbx = value_u64,
+      "rcx" => user_struct.regs.rcx = value_u64,
+      "rdx" => user_struct.regs.rdx = value_u64,
+      "r8"  => user_struct.regs.r8 = value_u64,
+      "r9"  => user_struct.regs.r9 = value_u64,
+      "r10" => user_struct.regs.r10 = value_u64,
+      "r11" => user_struct.regs.r11 = value_u64,
+      "r12" => user_struct.regs.r12 = value_u64,
+      "r13" => user_struct.regs.r13 = value_u64,
+      "r14" => user_struct.regs.r14 = value_u64,
+      "r15" => user_struct.regs.r15 = value_u64,
+      "rsp" => user_struct.regs.rsp = value_u64,
+      "rbp" => user_struct.regs.rbp = value_u64,
+      "rsi" => user_struct.regs.rsi = value_u64,
+      "rdi" => user_struct.regs.rdi = value_u64,
+      "rip" => user_struct.regs.rip = value_u64,
+      "cs"  => user_struct.regs.cs = value_u64,
+      "ds"  => user_struct.regs.ds = value_u64,
+      "es"  => user_struct.regs.es = value_u64,
+      "fs"  => user_struct.regs.fs = value_u64,
+      "gs"  => user_struct.regs.gs = value_u64,
+      "ss"  => user_struct.regs.ss = value_u64,
+      "eflags" => user_struct.regs.eflags = value_u64,
+      _ => panic!("reg :{} not found", reg_name)
     }
+      self.set_user_struct(&user_struct);
+    }
+
   }
 
 
-}
 

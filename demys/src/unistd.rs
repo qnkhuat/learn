@@ -17,10 +17,16 @@ pub fn getppid() -> pid_t {
 }
 
 pub fn wait() -> Result<pid_t, std::io::Error>{
-  let mut status: pid_t = 0;
+  let mut status: i32 = 0;
   unsafe {libc::waitpid(-1, &mut status, 0);}
 
   return Ok(status);
+}
+
+pub fn kill(pid: pid_t) {
+  unsafe {
+    libc::kill(pid, libc::SIGKILL);
+  }
 }
 
 pub fn execv(target: &String, argv: &[String]) -> Result<(), std::io::Error>{

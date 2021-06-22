@@ -4,3 +4,4 @@ lldb internal strucures - [doc](https://lldb.llvm.org/design/overview.html) [sou
 
 ABI [link](https://www.uclibc.org/docs/psABI-x86_64.pdf)
 
+Guideline [link](https://blog.tartanllama.xyz/writing-a-linux-debugger-setup/)

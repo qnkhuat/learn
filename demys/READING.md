@@ -14,3 +14,8 @@ Dependencies:
 ## Software breakpoints
 - On x86 we overwite the instruction address with `int 3` instruction to halt the program
 - When the processor execute an `int 3` insruction => control is passed to the breakpoint interrupt handler, which mean signal process with a SIGTRAP
+
+
+# What I learned
+- When a program run the OS will allocate for it a virutal memory, we can check the segment mapping at /proc/[pid]/maps
+- We can find address of instruction of a program by objdump the binary, find the address of instruction we want to set. add it to the base address of program in the segment mapping
