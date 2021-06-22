@@ -97,7 +97,7 @@ fn debug_loop(prog: &mut target::TargetProgram) {
         if input_split.len() > 2 && input_split[1] == "get" {
           let addr = str2usize(&input_split[2]);
           let value = prog.peek_data(addr);
-          println!("(0x{}): 0x{:016x}", addr, value);
+          println!("(0x{:016x}): 0x{:016x}", addr, value);
         } else if input_split.len() > 3 && input_split[1] == "set" {
           let addr = str2usize(&input_split[2]);
           let value = str2usize(&input_split[3]);

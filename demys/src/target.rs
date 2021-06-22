@@ -15,10 +15,9 @@ impl Breakpoint {
   pub fn enable(&mut self) {
     let data = ptrace::peek_data(self.pid, self.addr).unwrap();
     self.orig_byte = data;
-    self.enabled = true;
-
     /* 0xCC is the machine code for int $3 on x86_64 - the interupt instruction */
     ptrace::poke_data(self.pid, self.addr, 0xcc);
+    self.enabled = true;
   }
 
   pub fn disable(&mut self) {
@@ -63,13 +62,9 @@ impl TargetProgram {
   }
 
   pub fn cont(&mut self) {
-    println!("Before step over : 0x{:016x}", self.get_pc());
     self.step_over_breakpoint();
-    println!("After step over : 0x{:016x}", self.get_pc());
     ptrace::cont(self.pid).unwrap();
-    println!("Continued process : 0x{:016x}", self.get_pc());
     self.wait();
-    println!("Wait again process : 0x{:016x}", self.get_pc());
   }
   
   pub fn peek_data(&mut self, addr: usize) -> usize {
@@ -97,17 +92,14 @@ impl TargetProgram {
 
 
   pub fn set_breakpoint(&mut self, addr: usize) {
-    
-    /* 0xCC is the machine code for int $3 on x86_64 - the interupt instruction */
-    self.poke_data(addr, 0xCC);
 
-    let data = self.peek_data(addr);
-    let bp = Breakpoint{
+    let mut bp = Breakpoint{
       pid: self.pid,
       addr: addr, 
-      orig_byte: data,
-      enabled:true
+      orig_byte: 0,
+      enabled: false
     };
+    bp.enable();
     
     self.breakpoints.push(bp);
   }
@@ -118,19 +110,13 @@ impl TargetProgram {
     println!("Current_pc_location: 0x{:016x},  prev_pc_location: 0x{:016x}, len: {}", self.get_pc(), prev_pc_location, self.breakpoints.len());
 
     for i in 0..self.breakpoints.len() {
-      println!("Searching :{}, addr: 0x{:016x}, enabled: {}", i, self.breakpoints[i].addr, self.breakpoints[i].enabled);
-      println!("Do you even exist? :{} ", prev_pc_location == self.breakpoints[i].addr);
-      //let mut bp = self.breakpoints[i].clone();
       if self.breakpoints[i].addr == prev_pc_location && self.breakpoints[i].enabled {
+        println!("Hit the fucking breakpoint");
         self.set_pc(&prev_pc_location);
-        println!("Reset the PC: 0x{:016x},  prev_pc_location: 0x{:016x}, The 2 should be equal now", self.get_pc(), prev_pc_location);
-
         self.breakpoints[i].disable();
-        println!("PC before single step: 0x{:016x}", self.get_pc());
         self.singlestep();
-        println!("PC after single step: 0x{:016x}", self.get_pc());
         self.wait();
-        self.breakpoints[i].enable();
+        //self.breakpoints[i].enable();
         return;
       }
     }
