@@ -20,4 +20,21 @@ Dependencies:
 - When a program run the OS will allocate a virutal memory space for it, we can check the segment mapping at /proc/[pid]/maps
 - We can find address of instruction of a program by objdump the binary, find the address of instruction we want to set. add it to the base address of program in the segment mapping
 - ELF(Executable and Linkable Format) : A format specifies how to store code, static data, debug info, strings in a binary.
-- DWARF : the debug information format commonly used with ELF. (`dwarfdump` is a tool like objdump but for dwarf)
+  - DWARF : the debug information format commonly used with ELF. (`dwarfdump` is a tool like objdump but for dwarf)
+  - the `debug_line` section: will tell you which range of lines belogn to which mem address
+  - the `debug_info` section: give information about types, functions, vars
+
+- Set breakpoint funcrtion by name
+
+## Set breakpoint by line number
+- look into the `debug_line` section to find the range of this line belong to
+- set breakpoint at base address of the range + offset line number
+
+## Set breakpoint by function name
+- Look into `debug_info` section and find subsection contains `DW_AT_name` that match function anme
+- In the same section the `DW_AT_low_pc` will tell us the address of function => set braekpoint there
+
+## How to read content of variables
+- find in `debug_info` the subsection contains variable we need to set
+- the variable address will be at  `DW_AT_frame_base + DW_AT_location`
+

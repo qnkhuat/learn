@@ -1,20 +1,19 @@
-use libc::pid_t;
-use crate::unistd;
 use crate::ptrace;
-use std::path::Path;
-use std::io::{self, Write, BufReader, BufRead};
-use std::fs::File;
-use std::process::{exit};
+use crate::unistd;
 use gimli;
-use object;
+use libc::pid_t;
 use memmap;
+use object;
 use object::{Object, ObjectSection};
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Write};
+use std::path::Path;
+use std::process::exit;
 use std::{borrow, env, fs};
 
 fn str2usize(s: &str) -> usize {
   usize::from_str_radix(s.trim(), 16).unwrap()
 }
-
 
 // *** Breakpoint ***
 #[derive(Clone)]
@@ -46,12 +45,12 @@ pub struct TargetProgram {
   executable: String,
   breakpoints: Vec<Breakpoint>,
   base_addr: usize,
-  dwarf: gimli::Dwarf,
+  dwarf: gimli::write::Dwarf,
 }
 
 impl TargetProgram {
   pub fn new(pid: pid_t, path: &String) -> TargetProgram {
-    TargetProgram{
+    TargetProgram {
       pid: pid,
       executable: (*path).clone(),
       breakpoints: Vec::new(),
@@ -69,17 +68,19 @@ impl TargetProgram {
     reader.read_line(&mut first_line).unwrap();
     self.base_addr = str2usize(first_line.split("-").collect::<Vec<&str>>()[0]);
   }
-  
+
   pub fn load_dwarf(&mut self) {
     let file = fs::File::open(&self.executable).unwrap();
     let mmap = unsafe { memmap::Mmap::map(&file).unwrap() };
-    let object = object::File::parse(&*mmap).unwrap();
+    println!("mmap: {}", mmap)
+      let object = object::File::parse(&*mmap).unwrap();
     let endian = if object.is_little_endian() {
       gimli::RunTimeEndian::Little
     } else {
       gimli::RunTimeEndian::Big
     };
 
+    // borrow::Cow : Clone on write
     let load_section = |id: gimli::SectionId| -> Result<borrow::Cow<[u8]>, gimli::Error> {
       match object.section_by_name(id.name()) {
         Some(ref section) => Ok(section
@@ -94,9 +95,10 @@ impl TargetProgram {
 
     // Borrow a `Cow<[u8]>` to create an `EndianSlice`.
     let borrow_section: &dyn for<'a> Fn(
-        &'a borrow::Cow<[u8]>,
-    ) -> gimli::EndianSlice<'a, gimli::RunTimeEndian> =
-        &|section| gimli::EndianSlice::new(&*section, endian);
+      &'a borrow::Cow<[u8]>,
+      )
+      -> gimli::EndianSlice<'a, gimli::RunTimeEndian> =
+      &|section| gimli::EndianSlice::new(&*section, endian);
 
     // Create `EndianSlice`s for all of the sections.
     let dwarf = dwarf_cow.borrow(&borrow_section);
@@ -125,18 +127,17 @@ impl TargetProgram {
     //    }
     //}
     return;
-    
   }
 
-  pub fn offset_load_addr(&mut self, addr: usize) -> usize{
+  pub fn offset_load_addr(&mut self, addr: usize) -> usize {
     return addr - self.base_addr;
   }
 
-  pub fn offset_dawrf_addr(&mut self, addr: usize) -> usize{
+  pub fn offset_dawrf_addr(&mut self, addr: usize) -> usize {
     return addr + self.base_addr;
   }
 
-  pub fn breakpoints(&mut self) -> Vec<Breakpoint>{
+  pub fn breakpoints(&mut self) -> Vec<Breakpoint> {
     return self.breakpoints.clone();
   }
 
@@ -153,7 +154,7 @@ impl TargetProgram {
     ptrace::cont(self.pid).unwrap();
     self.wait();
   }
-  
+
   pub fn peek_data(&mut self, addr: usize) -> usize {
     let data: usize = ptrace::peek_data(self.pid, addr).unwrap();
     return data;
@@ -163,37 +164,43 @@ impl TargetProgram {
     ptrace::poke_data(self.pid, addr, data);
   }
 
-  pub fn wait(&mut self) -> i32{
+  pub fn wait(&mut self) -> i32 {
     return unistd::wait().unwrap() as i32;
   }
-  
-  pub fn pid(&mut self) -> &pid_t {&self.pid}
+
+  pub fn pid(&mut self) -> &pid_t {
+    &self.pid
+  }
 
   pub fn get_pc(&mut self) -> usize {
     return self.get_reg_value("rip");
   }
 
-  pub fn set_pc(&mut self, value: &usize){
+  pub fn set_pc(&mut self, value: &usize) {
     self.set_reg_value("rip", value);
   }
 
   pub fn set_breakpoint(&mut self, addr: usize) {
-
-    let mut bp = Breakpoint{
+    let mut bp = Breakpoint {
       pid: self.pid,
-      addr: addr, 
+      addr: addr,
       orig_byte: 0,
-      enabled: false
+      enabled: false,
     };
     bp.enable();
-    
+
     self.breakpoints.push(bp);
   }
 
   pub fn step_over_breakpoint(&mut self) {
     // - 1 because execution will go pass the breakpoint
-    let prev_pc_location = self.get_pc() - 1; 
-    println!("Current_pc_location: 0x{:016x},  prev_pc_location: 0x{:016x}, len: {}", self.get_pc(), prev_pc_location, self.breakpoints.len());
+    let prev_pc_location = self.get_pc() - 1;
+    println!(
+      "Current_pc_location: 0x{:016x},  prev_pc_location: 0x{:016x}, len: {}",
+      self.get_pc(),
+      prev_pc_location,
+      self.breakpoints.len()
+      );
 
     for i in 0..self.breakpoints.len() {
       if self.breakpoints[i].addr == prev_pc_location && self.breakpoints[i].enabled {
@@ -219,15 +226,15 @@ impl TargetProgram {
     ptrace::set_user_struct(self.pid, user_struct);
   }
 
-  pub fn get_reg_value(&mut self, reg_name: &str) -> usize{
+  pub fn get_reg_value(&mut self, reg_name: &str) -> usize {
     let regs = self.get_user_struct().regs;
     return match reg_name.trim().to_ascii_lowercase().as_str() {
       "rax" => regs.rax,
       "rbx" => regs.rbx,
       "rcx" => regs.rcx,
       "rdx" => regs.rdx,
-      "r8"  => regs.r8,
-      "r9"  => regs.r9,
+      "r8" => regs.r8,
+      "r9" => regs.r9,
       "r10" => regs.r10,
       "r11" => regs.r11,
       "r12" => regs.r12,
@@ -239,14 +246,14 @@ impl TargetProgram {
       "rsi" => regs.rsi,
       "rdi" => regs.rdi,
       "rip" => regs.rip,
-      "cs"  => regs.cs,
-      "ds"  => regs.ds,
-      "es"  => regs.es,
-      "fs"  => regs.fs,
-      "gs"  => regs.gs,
-      "ss"  => regs.ss,
+      "cs" => regs.cs,
+      "ds" => regs.ds,
+      "es" => regs.es,
+      "fs" => regs.fs,
+      "gs" => regs.gs,
+      "ss" => regs.ss,
       "eflags" => regs.eflags,
-      _ => panic!("Reg : {} not found", reg_name)
+      _ => panic!("Reg : {} not found", reg_name),
     } as usize;
   }
 
@@ -258,8 +265,8 @@ impl TargetProgram {
       "rbx" => user_struct.regs.rbx = value_u64,
       "rcx" => user_struct.regs.rcx = value_u64,
       "rdx" => user_struct.regs.rdx = value_u64,
-      "r8"  => user_struct.regs.r8 = value_u64,
-      "r9"  => user_struct.regs.r9 = value_u64,
+      "r8" => user_struct.regs.r8 = value_u64,
+      "r9" => user_struct.regs.r9 = value_u64,
       "r10" => user_struct.regs.r10 = value_u64,
       "r11" => user_struct.regs.r11 = value_u64,
       "r12" => user_struct.regs.r12 = value_u64,
@@ -271,17 +278,17 @@ impl TargetProgram {
       "rsi" => user_struct.regs.rsi = value_u64,
       "rdi" => user_struct.regs.rdi = value_u64,
       "rip" => user_struct.regs.rip = value_u64,
-      "cs"  => user_struct.regs.cs = value_u64,
-      "ds"  => user_struct.regs.ds = value_u64,
-      "es"  => user_struct.regs.es = value_u64,
-      "fs"  => user_struct.regs.fs = value_u64,
-      "gs"  => user_struct.regs.gs = value_u64,
-      "ss"  => user_struct.regs.ss = value_u64,
+      "cs" => user_struct.regs.cs = value_u64,
+      "ds" => user_struct.regs.ds = value_u64,
+      "es" => user_struct.regs.es = value_u64,
+      "fs" => user_struct.regs.fs = value_u64,
+      "gs" => user_struct.regs.gs = value_u64,
+      "ss" => user_struct.regs.ss = value_u64,
       "eflags" => user_struct.regs.eflags = value_u64,
-      _ => panic!("reg :{} not found", reg_name)
+      _ => panic!("reg :{} not found", reg_name),
     }
-      self.set_user_struct(&user_struct);
-    }
+    self.set_user_struct(&user_struct);
+  }
 
   pub fn run(&mut self) {
     self.wait();
@@ -293,8 +300,12 @@ impl TargetProgram {
     loop {
       let mut input = String::new();
       print!("(demys) > ");
-      std::io::stdout().flush().expect("DBG: failed to flush stdout");
-      std::io::stdin().read_line(&mut input).expect("DBG: Couldn't read from stdin");
+      std::io::stdout()
+        .flush()
+        .expect("DBG: failed to flush stdout");
+      std::io::stdin()
+        .read_line(&mut input)
+        .expect("DBG: Couldn't read from stdin");
 
       if input.trim().len() == 0 {
         input = last_input.clone();
@@ -313,11 +324,9 @@ impl TargetProgram {
           println!("\t Continue execution");
           println!("");
 
-
           println!("b | break <addr>:");
           println!("\t Set break point at address");
           println!("");
-
 
           println!("mem get <addr> : mem get 000003b1 ");
           println!("\t Get memory value at address");
@@ -342,8 +351,6 @@ impl TargetProgram {
           println!("q | quit:");
           println!("\t Exit Demys");
           println!("");
-
-
         }
         "cont" | "c" => {
           self.cont();
@@ -351,7 +358,10 @@ impl TargetProgram {
         "lsb" => {
           let breakpoints = self.breakpoints();
           for i in 0..breakpoints.len() {
-            println!("br {}: 0x{:016x}, data: 0x{:016x}", i, breakpoints[i].addr, breakpoints[i].orig_byte);
+            println!(
+              "br {}: 0x{:016x}, data: 0x{:016x}",
+              i, breakpoints[i].addr, breakpoints[i].orig_byte
+              );
           }
         }
         "b" | "break" => {
@@ -390,36 +400,43 @@ impl TargetProgram {
             println!("SS: Stack Segment");
             println!("DS: Data Segment");
             println!("(E|F|G)S: Extra Segment");
-
           } else if input_split.len() > 2 && input_split[1] == "get" {
-
             let reg_name = input_split[2].trim();
-            let reg_value: usize= self.get_reg_value(&reg_name);
+            let reg_value: usize = self.get_reg_value(&reg_name);
             println!("Reg {}: 0x{:016x}", reg_name, reg_value)
-
           } else if input_split.len() > 3 && input_split[1] == "set" {
-
             let reg_name = input_split[2].trim();
 
             let set_value = str2usize(&input_split[3]);
 
             self.set_reg_value(&reg_name, &set_value);
-
           } else {
             let regs = self.get_user_struct().regs;
 
-            println!("rax: 0x{:016x} rbx: 0x{:016x} rcx: 0x{:016x} rdx: 0x{:016x}",
-                     regs.rax, regs.rbx, regs.rcx, regs.rdx);
-            println!("r15: 0x{:016x} r14: 0x{:016x} r13: 0x{:016x} r12: 0x{:016x}",
-                     regs.r15, regs.r14, regs.r13, regs.r12);
-            println!("r11: 0x{:016x} r10: 0x{:016x} r9:  0x{:016x} r8:  0x{:016x}",
-                     regs.r11, regs.r10, regs.r9, regs.r8);
-            println!("rsp: 0x{:016x} rbp: 0x{:016x} rsi: 0x{:016x} rdi: 0x{:016x}",
-                     regs.rsp, regs.rbp, regs.rsi, regs.rdi);
-            println!("rip: 0x{:016x} cs: 0x{:04x} eflags: 0x{:08x}",
-                     regs.rip, regs.cs, regs.eflags);
-            println!("ss: 0x{:04x} ds: 0x{:04x} es: 0x{:04x} fs: 0x{:04x} gs: 0x{:04x}",
-                     regs.ss, regs.ds, regs.es, regs.fs, regs.gs);
+            println!(
+              "rax: 0x{:016x} rbx: 0x{:016x} rcx: 0x{:016x} rdx: 0x{:016x}",
+              regs.rax, regs.rbx, regs.rcx, regs.rdx
+              );
+            println!(
+              "r15: 0x{:016x} r14: 0x{:016x} r13: 0x{:016x} r12: 0x{:016x}",
+              regs.r15, regs.r14, regs.r13, regs.r12
+              );
+            println!(
+              "r11: 0x{:016x} r10: 0x{:016x} r9:  0x{:016x} r8:  0x{:016x}",
+              regs.r11, regs.r10, regs.r9, regs.r8
+              );
+            println!(
+              "rsp: 0x{:016x} rbp: 0x{:016x} rsi: 0x{:016x} rdi: 0x{:016x}",
+              regs.rsp, regs.rbp, regs.rsi, regs.rdi
+              );
+            println!(
+              "rip: 0x{:016x} cs: 0x{:04x} eflags: 0x{:08x}",
+              regs.rip, regs.cs, regs.eflags
+              );
+            println!(
+              "ss: 0x{:04x} ds: 0x{:04x} es: 0x{:04x} fs: 0x{:04x} gs: 0x{:04x}",
+              regs.ss, regs.ds, regs.es, regs.fs, regs.gs
+              );
           }
         }
         "pid" => {
@@ -434,4 +451,3 @@ impl TargetProgram {
     }
   }
 }
-
