@@ -38,6 +38,24 @@ With VGA text buffer we can:
 - Use Ascii 
 - Load font
 
+
+# Chapter 3 - VGA text mode
+VGA text buffer layout
+
+Bit(s)	|  Value
+0-7     |  ASCII code point
+8-11	  |  Foreground color
+12-14	  |  Background color
+15	    |  Blink
+
+
+Default dimension: 25x80
+
+Memory mapped Address: 0xb8000
+
+By writting to this address we will control what to display
+ 
+
 # Resources
 [Operators and Symbols](https://doc.rust-lang.org/book/appendix-02-operators.html)
 
