@@ -1,24 +1,34 @@
 #![no_std] // There are no std in our own OS
 #![no_main] // Disable RUST default entry points
+#![feature(custom_test_frameworks)]
+#![test_runner(rustos::test_runner)]
+#![reexport_test_harness_main = "test_main"] // redefine test's entry point so we can conditionally call test in test_context
 
+use rustos::println;
 use core::panic::PanicInfo;
 
-mod vga_buffer;
-
-static HELLO: &[u8] = b"Hello World!";
-
-// Entry point
-#[no_mangle] // Making sure compile doesn't mangle the function name
 // we choose _start as entrypoint bc it's the entry point name of most system
 // pub extern "C" => tell compiler that it should use C calling convention
+#[no_mangle] // Making sure compile doesn't mangle the function name
 pub extern "C" fn _start() -> ! { 
   println!("Hello World{}", "!");
+
+  #[cfg(test)]
+  test_main();
+
   loop {}
 }
 
 // This function is called on panic
+#[cfg(not(test))] // run when not in test context
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {  // ! is "never" type
+fn panic(info: &PanicInfo) -> ! {  // ! is "never" type
   println!("{}", info);
   loop {}
+}
+
+#[cfg(test)]
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+  rustos::test_panic_handler(info)
 }

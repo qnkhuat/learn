@@ -40,6 +40,14 @@ With VGA text buffer we can:
 
 
 # Chapter 3 - VGA text mode
+The way we write string is we write to a memory mapped I/O address.
+
+In our case the base address of display is 0xb80000 wit a default dimension: 25x80 => that means starting from 0xb8000 to 0xb8000 + 25*80
+
+This address is not mapped to RAM but directly some memroy on a VGA device
+
+By writting to this address we will control what to display
+
 VGA text buffer layout
 
 Bit(s)	|  Value
@@ -48,13 +56,19 @@ Bit(s)	|  Value
 12-14	  |  Background color
 15	    |  Blink
 
+## Note about port-mapped I/O
+This is especially true on x86_64: that peripherals often has 2 communication channel: memory mapped I/O and port-mapped I/O
 
-Default dimension: 25x80
+In constast with memory-mapped I/O, port-mapped I/O use a seperate I/O bus for communication. Each peripherals has one or more port numbers.
 
-Memory mapped Address: 0xb8000
+We'll use the port-mapped I/O to to exit the QEMU by writing a value to its port
 
-By writting to this address we will control what to display
- 
+# Chapter 4 - Testing
+After running test inside our OS, we need a way to communicate the results back to our machine.
+
+One way is to create a TCP network interface, but this is complicated. Instead we are going to use serial port - an old interface standard.
+
+There are ltos of UART models on X86 but fortunately most of them are compaptible with 16550 UART, so we will that model for our testing framework
 
 # Resources
 [Operators and Symbols](https://doc.rust-lang.org/book/appendix-02-operators.html)

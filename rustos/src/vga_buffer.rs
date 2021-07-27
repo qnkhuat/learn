@@ -3,6 +3,9 @@ use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
+// *** Test cases ***
+
+// *** Macros ****
 #[macro_export]
 macro_rules! print {
   //The $crate variable ensures that the macro also works from outside the std crate by expanding to std when it's used in other crates.
@@ -14,6 +17,31 @@ macro_rules! println {
   () => ($crate::print!("\n"));
   ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
+
+
+#[test_case]
+fn test_println_output() {
+  let s = "Some test string that fits on a single line";
+  println!("{}", s);
+  for (i, c) in s.chars().enumerate() {
+    let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
+    assert_eq!(char::from(screen_char.ascii_character), c);
+  }
+}
+
+#[test_case]
+fn test_println_simple() {
+  println!("test_println_simple output");
+  // if not panci => success
+}
+
+#[test_case]
+fn test_println_many() {
+  for i in 0..200 {
+    println!("test_println_many({}) output", i);
+  }
+}
+
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
