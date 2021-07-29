@@ -86,7 +86,7 @@ There are lots of UART models on X86 but fortunately most of them are compaptibl
 
 # Chapter 5 - CPU Exceptions
 ## Summary
-What happens and how do we handle exception at OS level
+What happens and how do we handle exceptions(divide_by zero, breakpoint, overflow ... etc) at OS level
 
 ## How it works
 While runnning if a program yield an exception signal (E.g: Try to divide by 0) the CPU will interrupt and calls a specific excepiton handler funciton.
@@ -120,5 +120,45 @@ With our exception we need an call convention that when an exception occur, it g
 ## Further reading
 [Handling Exceptions using naked Functions](https://os.phil-opp.com/edition-1/extra/naked-exceptions/)
 
+# Chapter 6 - Double Faults
+## Summary
+
+## What is double fault
+Double fault is a special exception that occurs when CPU fails to invoke an exception handler
+
+A double faults can lead to a triple faults:
+- The program get an exception
+- It looks for an exception hanlder and don't find any
+- It looks for a double fault handler => don't find any
+- Triple fault ocurrs and the hardware will issues a restart => the loop starts again
+
+## Kernel stack overflow
+What happens when the handler cause a page fault?
+
+For example when our program overflow its stack and now the kernel try to invoke the page fault handler, but this handler will push its own stack frame to the stack => trigger another page fault => tripple fault occurs => restart
+
+To handle this problem we will need to switch stacks
+
+In x86_64 arch is able to switch to a predefined, known-good stack when an exception occur. This switch happens at hardware level.
+
+The switching mechanism is implemented as an Interrupt Stack Table (IST). This table has 7 pointesr to known-good stacks
+
 # Resources
 [Operators and Symbols](https://doc.rust-lang.org/book/appendix-02-operators.html)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
