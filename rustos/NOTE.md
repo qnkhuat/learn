@@ -1,4 +1,4 @@
-# Chapter 1 - Freestanding RUST
+# Post 1 - Freestanding RUST
 ## Summary
 Setting up a RUST dev env where we don't have any OS dependent in our compiled binary
 
@@ -16,7 +16,7 @@ Bare metal meaning we don't run our program on top of any OS, instead we run it 
 That means we need to compile our program to a host system that doesn't are bare metal.
 In this post we use thumbv7em-none-eabihf ( an embbeded ARM ) as the compiled host
 
-# Chapter 2 - Minimal Rust kernel
+# Post 2 - Minimal Rust kernel
 ## Summary
 Set up an OS kernel where we can boot, print on either simulation(QEMU) or real machine(x86_64)
 
@@ -46,7 +46,7 @@ With VGA text buffer we can:
 - Load font
 
 
-# Chapter 3 - VGA text mode
+# Post 3 - VGA text mode
 
 ## Summary
 Learn about how do we programmatically print characters to a display
@@ -76,7 +76,7 @@ In constast with memory-mapped I/O, port-mapped I/O use a seperate I/O bus for c
 
 We'll use the port-mapped I/O to to exit the QEMU by writing a value to its port
 
-# Chapter 4 - Testing
+# Post 4 - Testing
 After running test inside our OS, we need a way to communicate the results back to our machine.
 
 One way is to create a TCP network interface, but this is complicated. Instead we are going to use serial port - an old interface standard.
@@ -84,7 +84,7 @@ One way is to create a TCP network interface, but this is complicated. Instead w
 There are lots of UART models on X86 but fortunately most of them are compaptible with 16550 UART, so we will that model for our testing framework
 
 
-# Chapter 5 - CPU Exceptions
+# Post 5 - CPU Exceptions
 ## Summary
 What happens and how do we handle exceptions(divide_by zero, breakpoint, overflow ... etc) at OS level
 
@@ -120,8 +120,9 @@ With our exception we need an call convention that when an exception occur, it g
 ## Further reading
 [Handling Exceptions using naked Functions](https://os.phil-opp.com/edition-1/extra/naked-exceptions/)
 
-# Chapter 6 - Double Faults
+# Post 6 - Double Faults
 ## Summary
+What is double fault and how to handle them
 
 ## What is double fault
 Double fault is a special exception that occurs when CPU fails to invoke an exception handler
@@ -142,6 +143,27 @@ To handle this problem we will need to switch stacks
 In x86_64 arch is able to switch to a predefined, known-good stack when an exception occur. This switch happens at hardware level.
 
 The switching mechanism is implemented as an Interrupt Stack Table (IST). This table has 7 pointesr to known-good stacks
+
+# Post 7 - Hardware Interrupts
+
+## Summary
+How we connect peripherals and handle signals using interupt pattern
+
+## Interrupt controller 
+Is an integrated circuit that aggregates input from peripherals(Timer, Keyboard, Mouse ...) and the notifies the CPU. It also prioritize the signals
+
+Programmable interrupt controller(PIC) is widely used today, bc it's programmable we can control its priotize mechanism
+
+                             ____________             _____
+        Timer ------------> |            |           |     |
+        Keyboard ---------> | Interrupt  |---------> | CPU |
+        Other Hardware ---> | Controller |           |_____|
+        Etc. -------------> |____________|
+
+This make the x86_64 is an interrupt driven archictecture. This has many advantages:
+- hardware interrupts occurs async with cpu
+- kernel only have to act when something happened => faster reactions times and simpler design
+
 
 # Resources
 [Operators and Symbols](https://doc.rust-lang.org/book/appendix-02-operators.html)
