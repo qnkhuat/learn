@@ -7,8 +7,9 @@ use object;
 use object::{Object, ObjectSection};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
-use std::path::Path;
+//use std::path::Path;
 use std::process::exit;
+use std::rc::Rc;
 use std::{borrow, env, fs};
 
 fn str2usize(s: &str) -> usize {
@@ -39,41 +40,76 @@ impl Breakpoint {
   }
 }
 
+#[derive(Debug)]
+pub enum RcCow<'a, T: ?Sized> {
+  Owned(Rc<T>),
+  Borrowed(&'a T),
+}
+
+impl<T: ?Sized> Clone for RcCow<'_, T> {
+  fn clone(&self) -> Self {
+    match self {
+      RcCow::Owned(rc) => RcCow::Owned(rc.clone()),
+      RcCow::Borrowed(slice) => RcCow::Borrowed(&**slice),
+    }
+  }
+}
+
+impl<T: ?Sized> std::ops::Deref for RcCow<'_, T> {
+  type Target = T;
+
+  fn deref(&self) -> &Self::Target {
+    match self {
+      RcCow::Owned(rc) => &**rc,
+      RcCow::Borrowed(slice) => &**slice,
+    }
+  }
+}
+
+unsafe impl<T: ?Sized> gimli::StableDeref for RcCow<'_, T> {}
+unsafe impl<T: ?Sized> gimli::CloneStableDeref for RcCow<'_, T> {}
+pub type Reader<'a> = gimli::EndianReader<gimli::RunTimeEndian, RcCow<'a, [u8]>>;
+
 // *** Target Program ***
-pub struct TargetProgram {
+pub struct TargetProgram<'a> {
   pub pid: pid_t,
   executable: String,
   breakpoints: Vec<Breakpoint>,
   base_addr: usize,
-  dwarf: gimli::write::Dwarf,
+  dwarf: Option<gimli::Dwarf<Reader<'a>>>,
 }
 
-impl TargetProgram {
+impl TargetProgram<'_> {
   pub fn new(pid: pid_t, path: &String) -> TargetProgram {
     TargetProgram {
       pid: pid,
       executable: (*path).clone(),
       breakpoints: Vec::new(),
       base_addr: 0,
-      dawrf: gimli::Dwarf::new(),
+      dwarf: None,
     }
   }
 
+  // get base address of program in /proc/pid/maps
   pub fn initialize_base_address(&mut self) {
     let maps_filename = std::fmt::format(format_args!("/proc/{}/maps", self.pid));
     // Open the file in read-only mode (ignoring errors).
     let file = File::open(maps_filename).unwrap();
     let mut reader = BufReader::new(file);
-    let mut first_line = String::new();
+
+    // we assume the base address is always at the first line
+    let mut first_line = String::new(); 
     reader.read_line(&mut first_line).unwrap();
     self.base_addr = str2usize(first_line.split("-").collect::<Vec<&str>>()[0]);
   }
 
+  // Load dwarf debug info
   pub fn load_dwarf(&mut self) {
     let file = fs::File::open(&self.executable).unwrap();
+    
     let mmap = unsafe { memmap::Mmap::map(&file).unwrap() };
-    println!("mmap: {}", mmap)
-      let object = object::File::parse(&*mmap).unwrap();
+    let object = object::File::parse(&*mmap).unwrap();
+
     let endian = if object.is_little_endian() {
       gimli::RunTimeEndian::Little
     } else {
@@ -91,42 +127,43 @@ impl TargetProgram {
     };
 
     // Load all of the sections.
-    let dwarf_cow = gimli::Dwarf::load(&load_section).unwrap();
+    let mut dwarf_cow = gimli::Dwarf::load(&load_section).unwrap();
+    self.dwarf = Some(dwarf_cow);
 
-    // Borrow a `Cow<[u8]>` to create an `EndianSlice`.
-    let borrow_section: &dyn for<'a> Fn(
-      &'a borrow::Cow<[u8]>,
-      )
-      -> gimli::EndianSlice<'a, gimli::RunTimeEndian> =
-      &|section| gimli::EndianSlice::new(&*section, endian);
+    //// Borrow a `Cow<[u8]>` to create an `EndianSlice`.
+    //let borrow_section: &dyn for<'a> Fn(&'a borrow::Cow<[u8]>,)
+    //  -> gimli::EndianSlice<'a, gimli::RunTimeEndian> =
+    //  &|section| gimli::EndianSlice::new(&*section, endian);
 
-    // Create `EndianSlice`s for all of the sections.
-    let dwarf = dwarf_cow.borrow(&borrow_section);
-    self.dwarf = dwarf;
-    //// Iterate over the compilation units.
-    //let mut iter = dwarf.units();
-    //while let Some(header) = iter.next().unwrap() {
-    //    println!(
-    //        "Unit at <.debug_info+0x{:x}>",
-    //        header.offset().as_debug_info_offset().unwrap().0
-    //    );
-    //    let unit = dwarf.unit(header).unwrap();
+    ////self.dwarf = Some(dwarf_cow.copy());
+    //// Create `EndianSlice`s for all of the sections.
+    //self.dwarf = Some(dwarf_cow);
+    ////dwarf.fail___();
+    ////self.dwarf = Some(dwarf);
 
-    //    // Iterate over the Debugging Information Entries (DIEs) in the unit.
-    //    let mut depth = 0;
-    //    let mut entries = unit.entries();
-    //    while let Some((delta_depth, entry)) = entries.next_dfs().unwrap() {
-    //        depth += delta_depth;
-    //        println!("<{}><{:x}> {}", depth, entry.offset().0, entry.tag());
+    ////// Iterate over the compilation units.
+    ////let mut iter = dwarf.units();
+    ////while let Some(header) = iter.next().unwrap() {
+    ////    println!(
+    ////        "Unit at <.debug_info+0x{:x}>",
+    ////        header.offset().as_debug_info_offset().unwrap().0
+    ////    );
+    ////    let unit = dwarf.unit(header).unwrap();
 
-    //        // Iterate over the attributes in the DIE.
-    //        let mut attrs = entry.attrs();
-    //        while let Some(attr) = attrs.next().unwrap() {
-    //            println!("   {}: {:?}", attr.name(), attr.value());
-    //        }
-    //    }
-    //}
-    return;
+    ////    // Iterate over the Debugging Information Entries (DIEs) in the unit.
+    ////    let mut depth = 0;
+    ////    let mut entries = unit.entries();
+    ////    while let Some((delta_depth, entry)) = entries.next_dfs().unwrap() {
+    ////        depth += delta_depth;
+    ////        println!("<{}><{:x}> {}", depth, entry.offset().0, entry.tag());
+
+    ////        // Iterate over the attributes in the DIE.
+    ////        let mut attrs = entry.attrs();
+    ////        while let Some(attr) = attrs.next().unwrap() {
+    ////            println!("   {}: {:?}", attr.name(), attr.value());
+    ////        }
+    ////    }
+    ////}
   }
 
   pub fn offset_load_addr(&mut self, addr: usize) -> usize {

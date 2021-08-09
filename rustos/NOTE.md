@@ -165,6 +165,9 @@ This make the x86_64 is an interrupt driven archictecture. This has many advanta
 - kernel only have to act when something happened => faster reactions times and simpler design
 
 
+# Post 8 - Introduction to paging
+
+
 # Resources
 [Operators and Symbols](https://doc.rust-lang.org/book/appendix-02-operators.html)
 

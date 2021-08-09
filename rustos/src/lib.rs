@@ -81,7 +81,6 @@ pub fn init() {
   x86_64::instructions::interrupts::enable(); 
 }
 
-
 // halt
 pub fn hlt_loop() -> ! {
   loop {
