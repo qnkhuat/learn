@@ -3,14 +3,15 @@
     [compojure.core :refer [defroutes DELETE GET PUT]]
     [ring.middleware.params :refer [wrap-params]]
     [ring.middleware.session :refer [wrap-session]]
-    [compojure.route :refer [not-found] ]
     )
   (:gen-class))
 
 ;--- Store ---
 
-(defn new-store []
-  (ref {}))
+(defn new-store
+  ([] (ref {}))
+  ([data] (ref data))
+  )
 
 (defn set-store [store k v]
   (dosync (alter store assoc k v)))
@@ -56,15 +57,44 @@
         _ (merge-store transac-store (last @stores))]
     (swap! stores #(concat %1 [%2]) transac-store)))
 
+(defn wrap-store [handler stores]
+  (fn [request]
+    (handler (assoc request :stores stores))))
+
+;--- Route ---
 (defroutes routes 
-  (GET "/:key" [key] 
-       (str "input key is " key))
-  (not-found "<h1>Page not found</h1>")
+  (GET "/store/:key" [key :as {stores :stores}] 
+       (handle-get stores key))
+
+  (PUT "/store/:key/:value" [key value :as {stores :stores}]
+       (handle-set stores key value))
+
+  (DELETE "/store/:key" [key :as {stores :stores}]
+          (handle-del stores key))
+
+  (PUT "/begin" [:as {stores :stores}]
+       (handle-begin stores)
+       "OK")
+
+  (PUT "/commit" [:as {stores :stores}]
+       (handle-commit stores)
+       "OK")
+
+  (PUT "/rollback" [:as {stores :stores}]
+       (handle-rollback stores)
+       "OK")
+
+  (GET "/" []
+       (str "hi"))
   )
 
+
 (def app 
-  (-> routes
-      wrap-params
-      wrap-session
-      ))
+  (let [store (atom [(new-store)])]
+    (-> routes
+        wrap-params
+        wrap-session
+        (wrap-store store)
+        )))
+
 
