@@ -1,1 +1,0 @@
-(ns joyofclojure.test.core)

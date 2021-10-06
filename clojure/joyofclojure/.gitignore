@@ -1,3 +1,6 @@
+# jupyter
+.ipynb_checkpoints
+
 # linting
 .clj-kondo
 .lsp

@@ -1,2 +1,0 @@
-(ns joy.core)
-
