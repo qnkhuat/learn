@@ -1,0 +1,30 @@
+(require '[cljs.compiler :as comp]
+         '[cljs.analyzer :as ana])
+(def code-string "(defn hello [x] (js/alert (pr-str 'greetings x)))")
+(def code-data (read-string code-string))
+code-data
+(ana/empty-env)
+(def ast (ana/analyze (ana/empty-env) code-data))
+(def code-data (read-string code-string))
+code-data
+ana/analyze
+ana/empty-env
+(def ast (ana/analyze (ana/empty-env) code-data))
+(exit)
+(require '[cljs.compiler :as comp]
+         '[cljs.analyzer :as ana])
+(def code-string "(defn hello [x] (js/alert (pr-str 'greetings x)))")
+(def code-data (read-string code-string))
+(def ast (ana/analyze (ana/empty-env) code-data))
+(ana/analyze (ana/empty-env) code-data)
+(ana/empty-env)
+code-data
+ana/analyze
+(first code-data)
+(exit)
+(require '[cljs.compiler :as comp]
+         '[cljs.analyzer :as ana])
+(def code-string "(defn hello [x] (js/alert (pr-str 'greetings x)))")
+(def code-data (read-string code-string))
+(def ast (ana/analyze (ana/empty-env) code-data))
+(exit)
