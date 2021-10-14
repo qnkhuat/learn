@@ -258,4 +258,68 @@
 ; (out) 	low-severe	 5 (8.3333 %)
 ; (out)  Variance from outliers : 36.8802 % Variance is moderately inflated by outliers
 
+(defn true-λ
+  [a b]
+  a)
+
+(defn false-λ 
+  [a b]
+  b)
+
+(defn not
+  [x]
+  (x my-false my-true))
+
+
+(not true-λ)
+;; => #object[my.core$my_false 0x24d8080f "my.core$my_false@24d8080f"]
+
+(not my-false)
+;; => #object[my.core$my_true 0x27a4d1f8 "my.core$my_true@27a4d1f8"]
+
+
+(defn my-if
+  [pred a b]
+  (pred a b))
+
+(defmacro if-λ 
+  [pred a b]
+  `(~pred ~a ~b))
+
+(if-λ true-λ 1 2)
+
+
+(my-true '(prn "true") 2)
+
+(macroexpand-1 '(my-if my-false (prn "true") (prn "false")))
+;; => (my-true (prn "true") (prn "false"))
+
+
+(defmacro unless [pred a b]
+  `(if (not ~pred) ~a ~b))
+
+
+(macroexpand '(unless false (prn "true") (prn "false")))
+;; => (if (clojure.core/not false) (prn "true") (prn "false"))
+
+(unless false (println "Will print") (println "Will not print"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
