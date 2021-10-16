@@ -6,7 +6,10 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/core.async "1.3.618"]
                  [org.clojure/core.logic "1.0.0"]
+                 [org.clojars.hozumi/clj-commons-exec "1.0.6"]
+                 [jline "2.11"]
                  [criterium "0.4.6"]
+                  [clj-mmap "1.1.2"]
                  [org.clojure/core.match "0.2.0"]]
   :main ^:skip-aot my.core
   :target-path "target/%s"

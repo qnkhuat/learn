@@ -171,12 +171,13 @@
   [sum nums]
   (cl/run* [q]
            (cl/fresh [x y]
-                     (cfd/in x y (cfd/interval (apply min nums) (apply max nums)))
+                     (cl/membero x nums)
+                     (cl/membero y nums)
                      (cfd/< x y)
-                     (cfd/+ x y sum )
+                     (cfd/+ x y sum)
                      (cl/== q [x y]))))
 
-(two-sum-logic sum nums)
+(time (two-sum-logic sum nums))
 ;; => ([1 9] [2 8] [3 7] [4 6])
 
 (defn two-sum-lazy-filter
@@ -207,25 +208,27 @@
                  res
                  (inc i)))))))
 
-(two-sum-cache sum nums)
+(time (two-sum-cache sum nums))
 ;; => ([9 1] [8 2] [7 3] [6 4])
+
+((range 10) 3)
+
+(two-sum-cache 10 (range 10))
 
 ; --- Benchmark ---
 (criterium/bench (two-sum-logic sum nums))
 ; nums ( range 1000 )
 ; sum 1000
-; (out) Evaluation count : 500614680 in 60 samples of 8343578 calls.
-; (out)              Execution time mean : 109.958036 ns
-; (out)     Execution time std-deviation : 9.962168 ns
-; (out)    Execution time lower quantile : 105.354964 ns ( 2.5%)
-; (out)    Execution time upper quantile : 134.000087 ns (97.5%)
-; (out)                    Overhead used : 14.468425 ns
+; (out) Evaluation count : 496799400 in 60 samples of 8279990 calls.
+; (out)              Execution time mean : 108.506739 ns
+; (out)     Execution time std-deviation : 10.645517 ns
+; (out)    Execution time lower quantile : 105.132559 ns ( 2.5%)
+; (out)    Execution time upper quantile : 145.148535 ns (97.5%)
+; (out)                    Overhead used : 14.468788 ns
 ; (out) 
-; (out) Found 5 outliers in 60 samples (8.3333 %)
-; (out) 	low-severe	 2 (3.3333 %)
-; (out) 	low-mild	 3 (5.0000 %)
-; (out)  Variance from outliers : 65.2566 % Variance is severely inflated by outliers
-
+; (out) Found 9 outliers in 60 samples (15.0000 %)
+; (out) 	low-severe	 9 (15.0000 %)
+; (out)  Variance from outliers : 68.6743 % Variance is severely inflated by outliers
 
 (criterium/bench (two-sum-lazy-filter sum nums))
 ; nums ( range 1000 )
@@ -244,19 +247,18 @@
 ; (out)  Variance from outliers : 7.8279 % Variance is slightly inflated by outliers
 
 (criterium/bench (two-sum-cache sum nums))
-; nums ( range 1000 )
-; sum 1000
 ; eval (root-form): (criterium/bench (two-sum-cache sum nums))
-; (out) Evaluation count : 119400 in 60 samples of 1990 calls.
-; (out)              Execution time mean : 502.551583 µs
-; (out)     Execution time std-deviation : 25.789349 µs
-; (out)    Execution time lower quantile : 487.303832 µs ( 2.5%)
-; (out)    Execution time upper quantile : 563.980068 µs (97.5%)
-; (out)                    Overhead used : 14.468425 ns
+; (out) Evaluation count : 122880 in 60 samples of 2048 calls.
+; (out)              Execution time mean : 504.116267 µs
+; (out)     Execution time std-deviation : 15.434493 µs
+; (out)    Execution time lower quantile : 495.928240 µs ( 2.5%)
+; (out)    Execution time upper quantile : 539.692377 µs (97.5%)
+; (out)                    Overhead used : 14.468788 ns
 ; (out) 
-; (out) Found 5 outliers in 60 samples (8.3333 %)
-; (out) 	low-severe	 5 (8.3333 %)
-; (out)  Variance from outliers : 36.8802 % Variance is moderately inflated by outliers
+; (out) Found 9 outliers in 60 samples (15.0000 %)
+; (out) 	low-severe	 2 (3.3333 %)
+; (out) 	low-mild	 7 (11.6667 %)
+; (out)  Variance from outliers : 17.3996 % Variance is moderately inflated by outliers
 
 (defn true-λ
   [a b]
@@ -277,16 +279,14 @@
 (not my-false)
 ;; => #object[my.core$my_true 0x27a4d1f8 "my.core$my_true@27a4d1f8"]
 
-
-(defn my-if
-  [pred a b]
-  (pred a b))
-
 (defmacro if-λ 
   [pred a b]
   `(~pred ~a ~b))
 
 (if-λ true-λ 1 2)
+
+(macroexpand-1 '(if true-λ :truthy :falsy))
+;; => (if true-λ :truthy :falsy)
 
 
 (my-true '(prn "true") 2)
