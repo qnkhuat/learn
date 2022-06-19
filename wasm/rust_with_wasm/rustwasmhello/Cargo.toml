@@ -1,0 +1,10 @@
+[package]
+name = "rustwasmhello"
+version = "0.1.0"
+edition = "2021"
+
+# telling compiler that this wil lexpose a C-style dynamic lib
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
