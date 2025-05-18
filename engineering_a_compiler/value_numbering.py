@@ -20,7 +20,7 @@ class UOp:
       return f"({id(self)}: {self.op=}, {self.argument=})"
     else:
       return f"({id(self)}: {self.op=}, {[u for u in self.src]}, {self.argument=})"
-  
+
   def __hash__(self):
     # Include operation type in hash for proper value numbering
     if self.src is None:
@@ -35,7 +35,6 @@ class UOp:
     if self.src is None:
       return self.argument == other.argument
     return self.src == other.src
-
 
 """
 a = 2
