@@ -16,3 +16,8 @@ Tips for learning:
 - It's actually a good practice to break between focused mode with diffuse mode with activity like: playing video games, surf web, do short exercises, listen to a song.
 - Spaced repetitions: repeat after awhile what you've learned, this makes the knowledge write hard to your long term memory.
 - Importance of sleep: when you're awake, your brain create toxic products that make you think less clearly. Sleep will clean this up.
+
+# Chapter 4: Chunking and avoiding illusions of competence
+- Try to chunk the concept and abstract it so you can remember it easily (like building an abstraction)
+- Try to recall the material as you go, not just-re-read it as it often not make you really understand the material.
+- Illusions of competence is when you look at the solution. IT'S NOT YOUR
